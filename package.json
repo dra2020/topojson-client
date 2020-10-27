@@ -1,25 +1,26 @@
 {
-  "name": "topojson-client",
-  "version": "3.1.0",
+  "name": "@dra2020/topojson-client",
+  "version": "3.2.2",
   "description": "Manipulate TopoJSON and convert it to GeoJSON.",
   "keywords": [
     "topojson",
     "topology",
     "geojson"
   ],
-  "homepage": "https://github.com/topojson/topojson-client",
+  "homepage": "https://github.com/dra2020/topojson-client",
   "license": "ISC",
   "author": {
-    "name": "Mike Bostock",
+    "name": "Mike Bostock (fork Terry Crowley)",
     "url": "https://bost.ocks.org/mike"
   },
   "main": "dist/topojson-client.js",
+  "types": "src/index.d.ts",
   "unpkg": "dist/topojson-client.min.js",
   "jsdelivr": "dist/topojson-client.min.js",
   "module": "src/index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/topojson/topojson-client.git"
+    "url": "https://github.com/dra2020/topojson-client.git"
   },
   "bin": {
     "topo2geo": "bin/topo2geo",
@@ -29,13 +30,12 @@
   "files": [
     "bin/topo*",
     "dist/**/*.js",
-    "src/**/*.js"
+    "src/**/*.js",
+    "src/index.d.ts"
   ],
   "scripts": {
     "pretest": "rollup -c",
-    "test": "tape 'test/**/*-test.js' && eslint src test",
-    "prepublishOnly": "rm -rf dist && yarn test",
-    "postpublish": "git push && git push --tags && zip -j dist/${npm_package_name}.zip -- LICENSE README.md dist/${npm_package_name}.js dist/${npm_package_name}.min.js"
+    "test": "tape 'test/**/*-test.js' && eslint src test"
   },
   "dependencies": {
     "commander": "2"

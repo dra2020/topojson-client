@@ -1,5 +1,6 @@
 import reverse from "./reverse.js";
 import transform from "./transform.js";
+import getarc from "./getarc.js"
 
 export default function(topology, o) {
   if (typeof o === "string") o = topology.objects[o];
@@ -19,12 +20,11 @@ function feature(topology, o) {
 }
 
 export function object(topology, o) {
-  var transformPoint = transform(topology.transform),
-      arcs = topology.arcs;
+  var transformPoint = transform(topology.transform);
 
   function arc(i, points) {
     if (points.length) points.pop();
-    for (var a = arcs[i < 0 ? ~i : i], k = 0, n = a.length; k < n; ++k) {
+    for (var a = getarc(topology, i), k = 0, n = a.length; k < n; ++k) {
       points.push(transformPoint(a[k], k));
     }
     if (i < 0) reverse(points, n);

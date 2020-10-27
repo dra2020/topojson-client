@@ -6,3 +6,7 @@ export {default as neighbors} from "./neighbors.js";
 export {default as quantize} from "./quantize.js";
 export {default as transform} from "./transform.js";
 export {default as untransform} from "./untransform.js";
+export {default as getarc} from "./getarc.js";
+export {default as getarclength} from "./getarclength.js";
+export {default as packbinary} from "./pack.js";
+export {default as unpackbinary} from "./unpack.js";

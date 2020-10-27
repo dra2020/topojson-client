@@ -20,16 +20,26 @@ export default function(topology) {
     }
   }
 
-  topology.arcs.forEach(function(arc) {
-    var i = -1, n = arc.length, p;
-    while (++i < n) {
-      p = t(arc[i], i);
-      if (p[0] < x0) x0 = p[0];
-      if (p[0] > x1) x1 = p[0];
-      if (p[1] < y0) y0 = p[1];
-      if (p[1] > y1) y1 = p[1];
+  if (topology.arcs)
+    topology.arcs.forEach(function(arc) {
+      var i = -1, n = arc.length, p;
+      while (++i < n) {
+        p = t(arc[i], i);
+        if (p[0] < x0) x0 = p[0];
+        if (p[0] > x1) x1 = p[0];
+        if (p[1] < y0) y0 = p[1];
+        if (p[1] > y1) y1 = p[1];
+      }
+    });
+  else if (topology.packedarcs) {
+    var af = topology.packedarcs, narcs = af[0];
+    var z = 1;
+    for (var i = 0; i < narcs; i++) {
+      var npoints = af[z++], zpoint = af[z++];
+      for (var j = 0; j < npoints; j++)
+        bboxPoint([ af[zpoint++], af[zpoint++] ]);
     }
-  });
+  }
 
   for (key in topology.objects) {
     bboxGeometry(topology.objects[key]);

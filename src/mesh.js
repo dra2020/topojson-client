@@ -1,5 +1,6 @@
 import {object} from "./feature.js";
 import stitch from "./stitch.js";
+import getarclength from "./getarclength";
 
 export default function(topology) {
   return object(topology, meshArcs.apply(this, arguments));
@@ -8,7 +9,7 @@ export default function(topology) {
 export function meshArcs(topology, object, filter) {
   var arcs, i, n;
   if (arguments.length > 1) arcs = extractArcs(topology, object, filter);
-  else for (i = 0, arcs = new Array(n = topology.arcs.length); i < n; ++i) arcs[i] = i;
+  else for (i = 0, arcs = new Array(n = getarclength(topology)); i < n; ++i) arcs[i] = i;
   return {type: "MultiLineString", arcs: stitch(topology, arcs)};
 }
 

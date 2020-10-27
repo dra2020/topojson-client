@@ -1,3 +1,5 @@
+import getarc from "./getarc";
+
 export default function(topology, arcs) {
   var stitchedArcs = {},
       fragmentByStart = {},
@@ -7,7 +9,7 @@ export default function(topology, arcs) {
 
   // Stitch empty arcs first, since they may be subsumed by other arcs.
   arcs.forEach(function(i, j) {
-    var arc = topology.arcs[i < 0 ? ~i : i], t;
+    var arc = getarc(topology, i), t;
     if (arc.length < 3 && !arc[1][0] && !arc[1][1]) {
       t = arcs[++emptyIndex], arcs[emptyIndex] = i, arcs[j] = t;
     }
@@ -48,7 +50,7 @@ export default function(topology, arcs) {
   });
 
   function ends(i) {
-    var arc = topology.arcs[i < 0 ? ~i : i], p0 = arc[0], p1;
+    var arc = getarc(topology, i), p0 = arc[0], p1;
     if (topology.transform) p1 = [0, 0], arc.forEach(function(dp) { p1[0] += dp[0], p1[1] += dp[1]; });
     else p1 = arc[arc.length - 1];
     return i < 0 ? [p1, p0] : [p0, p1];
