@@ -3,7 +3,7 @@
 export default function(topology, i) {
   if (i < 0) i = ~i;
   if (topology.arcs !== undefined) return topology.arcs[i];
-  let af = topology.packedarcs; // as Float64Array;
+  let af = topology.packed.arcs; // as Float64Array;
   if (i >= af[0]) return undefined;
   let z = 1 + i*2;
   let npoints = af[z++];

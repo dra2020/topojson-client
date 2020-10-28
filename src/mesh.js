@@ -1,6 +1,7 @@
 import {object} from "./feature.js";
 import stitch from "./stitch.js";
 import getarclength from "./getarclength";
+import getobjectarcs from "./getobjectarcs.js";
 
 export default function(topology) {
   return object(topology, meshArcs.apply(this, arguments));
@@ -38,9 +39,9 @@ function extractArcs(topology, object, filter) {
   function geometry(o) {
     switch (geom = o, o.type) {
       case "GeometryCollection": o.geometries.forEach(geometry); break;
-      case "LineString": extract1(o.arcs); break;
-      case "MultiLineString": case "Polygon": extract2(o.arcs); break;
-      case "MultiPolygon": extract3(o.arcs); break;
+      case "LineString": extract1(getobjectarcs(topology, o)); break;
+      case "MultiLineString": case "Polygon": extract2(getobjectarcs(topology, o)); break;
+      case "MultiPolygon": extract3(getobjectarcs(topology, o)); break;
     }
   }
 

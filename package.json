@@ -1,6 +1,6 @@
 {
   "name": "@dra2020/topojson-client",
-  "version": "3.2.2",
+  "version": "3.2.4",
   "description": "Manipulate TopoJSON and convert it to GeoJSON.",
   "keywords": [
     "topojson",
@@ -13,10 +13,10 @@
     "name": "Mike Bostock (fork Terry Crowley)",
     "url": "https://bost.ocks.org/mike"
   },
-  "main": "dist/topojson-client.js",
+  "main": "dist/@dra2020/topojson-client.js",
   "types": "src/index.d.ts",
-  "unpkg": "dist/topojson-client.min.js",
-  "jsdelivr": "dist/topojson-client.min.js",
+  "unpkg": "dist/@dra2020/topojson-client.min.js",
+  "jsdelivr": "dist/@dra2020/topojson-client.min.js",
   "module": "src/index.js",
   "repository": {
     "type": "git",

@@ -35,8 +35,10 @@ export function meshArcs(topology: Topology, obj?: GeometryObject, filter?: (a: 
 export function neighbors(objects: GeometryObject[]): number[][];
 
 export function bbox(topology: Topology): GeoJSON.BBox;
-export function packbinary(topology: Topology): Topology;
-export function unpackbinary(topology: Topology): Topology;
+export function packArcs(topology: Topology): Topology;
+export function unpackArcs(topology: Topology): Topology;
+export function packArcIndices(topology: Topology): Topology;
+export function unpackArcIndices(topology: Topology): Topology;
 
 export function quantize<T extends Objects>(topology: Topology<T>, transform: Transform | number): Topology<T>;
 

@@ -1,9 +1,9 @@
-// unpackbinary
-// see pack.js for description of packed format
+// unpackArcs
+// see packarcs.js for description of packed format
 
 export default function(topology) {
-  if (topology == null || topology.packedarcs === undefined) return topology;
-  var af = topology.packedarcs;
+  if (topology == null || topology.packed === undefined || topology.packed.arcs === undefined) return topology;
+  var af = topology.packed.arcs;
   var nArcs = af[0];
   var arcs = new Array(nArcs);
   var z = 1;
@@ -17,7 +17,8 @@ export default function(topology) {
       a[j] = [ af[zpoint++], af[zpoint++] ];
     arcs[i] = a;
   }
-  delete topology.packedarcs;
+  delete topology.packed.arcs;
+  if (Object.keys(topology.packed).length == 0) delete topology.packed;
   topology.arcs = arcs;
   return topology;
 }

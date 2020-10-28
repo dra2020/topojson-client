@@ -1,5 +1,6 @@
 import {object} from "./feature.js";
 import stitch from "./stitch.js";
+import getobjectarcs from "./getobjectarcs.js";
 
 function planarRingArea(ring) {
   var i = -1, n = ring.length, a, b = ring[n - 1], area = 0;
@@ -21,8 +22,8 @@ export function mergeArcs(topology, objects) {
   function geometry(o) {
     switch (o.type) {
       case "GeometryCollection": o.geometries.forEach(geometry); break;
-      case "Polygon": extract(o.arcs); break;
-      case "MultiPolygon": o.arcs.forEach(extract); break;
+      case "Polygon": extract(getobjectarcs(topology, o)); break;
+      case "MultiPolygon": getobjectarcs(topology, o).forEach(extract); break;
     }
   }
 

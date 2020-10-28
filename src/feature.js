@@ -1,6 +1,7 @@
 import reverse from "./reverse.js";
 import transform from "./transform.js";
 import getarc from "./getarc.js"
+import getobjectarcs from "./getobjectarcs.js";
 
 export default function(topology, o) {
   if (typeof o === "string") o = topology.objects[o];
@@ -57,10 +58,10 @@ export function object(topology, o) {
       case "GeometryCollection": return {type: type, geometries: o.geometries.map(geometry)};
       case "Point": coordinates = point(o.coordinates); break;
       case "MultiPoint": coordinates = o.coordinates.map(point); break;
-      case "LineString": coordinates = line(o.arcs); break;
-      case "MultiLineString": coordinates = o.arcs.map(line); break;
-      case "Polygon": coordinates = polygon(o.arcs); break;
-      case "MultiPolygon": coordinates = o.arcs.map(polygon); break;
+      case "LineString": coordinates = line(getobjectarcs(topology, o)); break;
+      case "MultiLineString": coordinates = getobjectarcs(topology, o).map(line); break;
+      case "Polygon": coordinates = polygon(getobjectarcs(topology, o)); break;
+      case "MultiPolygon": coordinates = getobjectarcs(topology, o).map(polygon); break;
       default: return null;
     }
     return {type: type, coordinates: coordinates};

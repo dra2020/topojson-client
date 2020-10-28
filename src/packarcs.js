@@ -1,4 +1,4 @@
-// packbinary
+// packArcs
 
 export default function(topology) {
   // Convert arcs (array of arrays of point arrays) to packed representation.
@@ -26,6 +26,7 @@ export default function(topology) {
   if (zpoint !== nFloats)
     throw 'topoPack: packing error';
   delete topology.arcs;
-  topology.packedarcs = af;
+  if (topology.packed === undefined) topology.packed = {};
+  topology.packed.arcs = af;
   return topology;
 }
