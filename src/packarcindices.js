@@ -67,7 +67,10 @@ export default function(topology) {
   //      number of indices
   //      indices
 
-  if (topology == null || topology.objects === undefined) return topology;
+  if (topology == null
+      || topology.objects === undefined
+      || topology.packed && topology.packed.arcindices !== undefined)
+    return topology;
   var geos = topology.objects;
   var nInts = bufferSize(topology);
   var ab = new ArrayBuffer(nInts * 4);
