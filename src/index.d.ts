@@ -32,7 +32,7 @@ export function mesh(topology: Topology, obj?: GeometryObject, filter?: (a: Geom
 
 export function meshArcs(topology: Topology, obj?: GeometryObject, filter?: (a: GeometryObject, b: GeometryObject) => boolean): MultiLineString;
 
-export function neighbors(objects: GeometryObject[]): number[][];
+export function neighbors(objects: GeometryObject[], includeborder?: boolean): number[][];
 
 export function bbox(topology: Topology): GeoJSON.BBox;
 export function packArcs(topology: Topology): Topology;

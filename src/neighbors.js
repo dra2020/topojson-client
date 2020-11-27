@@ -1,6 +1,6 @@
 import bisect from "./bisect.js";
 
-export default function(objects) {
+export default function(objects, includeborder) {
   var indexesByArc = {}, // arc index -> array of object indexes
       neighbors = objects.map(function() { return []; });
 
@@ -37,6 +37,10 @@ export default function(objects) {
         var ij = indexes[j], ik = indexes[k], n;
         if ((n = neighbors[ij])[i = bisect(n, ik)] !== ik) n.splice(i, 0, ik);
         if ((n = neighbors[ik])[i = bisect(n, ij)] !== ij) n.splice(i, 0, ij);
+      }
+      if (includeborder && m == 1) {
+        var i0 = indexes[0], n0;
+        if ((n0 = neighbors[i0])[i = bisect(n0, -1)] !== -1) n0.splice(i, 0, -1);
       }
     }
   }
