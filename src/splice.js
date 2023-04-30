@@ -152,7 +152,7 @@ export default function(basetopology, shattertopology, objects) {
   var endpts = new hashmap(basetopology.packed.arcs.length * 1.4, hashPoint, equalPoint);
   var splices = new Map();
 
-  forAllArcPoints({ topology: basetopology, onlyOnce: true, walkPoints: true },
+  forAllArcPoints({ topology: basetopology, objects, onlyOnce: true, walkPoints: true },
      (topology, object, arc, i, npoints, point) => {
         var splice = { from: a, to: new Set(), allto: new Set() };
         oldarcset.set(a, splice);
@@ -163,43 +163,37 @@ export default function(basetopology, shattertopology, objects) {
       });
 
   // Now walk over shattering topology looking for interior points that have become arc endpoints and add that
-  // arc to the replacement set.
+  // arc to the replacement set. Also add any arcs that match an endpoint to the potential list of exact matches
+  // (if the arc is replicated rather than subdivided in the shattertopology).
   forAllArcPoints({ topology: shattertopology, onlyOnce: true, walkPoints: true },
     (topology, object, arc, i, npoints, point) => {
+        if (i == 0 || i == npoints-1)
+        {
+          var splice = intpts.get(point);
+          if (splice)
+            splice.to.add(arc);
+        }
+        if (i == 0)
+        {
+          var splice = endpts.get(point);
+          if (splice)
+            splice.allto.add(arc);
+        }
       });
-      XXX
-  b = shattertopology.packed.arcs;
-  for (var id in shattertopology.objects) {
-    var o = shattertopology.objects[id];
-    var arcs = flattenArcs(getobjectarcs(shattertopology, o));
-    arcs.forEach(a => {
-        var z = 1 + a * 2;
-        var npoints = b[z];
-        var zpoint = b[z+1];
-        var start = [b[zpoint], b[zpoint+1]];
-        var end = [b[zpoint+(npoints-1)*2], b[zpoint+(npoints-1)*2]];
-        var splice = intpts.get(start) || intpts.get(end);
-        if (splice)
-          splice.to.add(a);
-        splice = endpts.get(start);
-        if (splice)
-          splice.allto.add(a);
-      });
-  }
 
   // We still need to dedup arcs that occur in both. These are oldarcs that have nothing in their "to" set.
   // We can use the starting point to find all the possible dups that contain that starting point.
-  var b = basetopology.packed.arcs;
-  oldarcset.forEach((splice, a) => {
+  var pts = basetopology.packed.arcs;
+  oldarcset.forEach((splice, arc) => {
         var basesplice = splice;
         if (splice.to.size == 0) {
         // If this was not the special splice that is tracking allto, look it up from the start point.
         if (splice.allto.size == 0)
         {
-          var z = 1 + a * 2;
-          var npoints = b[z];
-          var zpoint = b[z+1];
-          var start = [ b[zpoint], b[zpoint+1] ];
+          var z = 1 + arc * 2;
+          var npoints = pts[z];
+          var zpoint = pts[z+1];
+          var start = [ pts[zpoint], pts[zpoint+1] ];
           splice = endpts.get(start);
           if (! splice)
             throw 'topojson.splice: yikes, expected to find starting point';
@@ -233,4 +227,15 @@ export default function(basetopology, shattertopology, objects) {
   // Update arcindices referenced in oldarcset the challenge initially is that we don't know how much bigger the
   // packed arc indices array is going to get because every instance of an indice that is replaced by > 1 index
   // results in growth. So walk over twice to get size and then walk over and do the copy.
+  var nExtra = 0;
+  forAllArcPoints({ topology: basetopology },
+    (topology, object, arc) => {
+        var splice = oldarcset.get(arc);
+        if (splice)
+          nExtra += splice.to.length - 1;
+      });
+
+  // Now create merged packed indices, mapping arcs from the old arc set to 1 or more new arcs from the
+  // shattered set.
+  var nDelta = XXX  // Delta to apply to shattertopology indices since they go at the end
 }
