@@ -49,18 +49,11 @@ function equalRings(r1, r2) {
   if (r1.length !== r2.length)
     return false;
 
-  // Try in same order
-  let i = 0;
-  for (; i < r1.length; i++)
-    if (! equalPoint(r1[i], r2[i]))
-      break;
-  if (i == r1.length)
-    return true;
+  r1 = r1.map(hashPoint).sort();
+  r2 = r2.map(hashPoint).sort();
 
-  // Try in reverse order
-  i = 0;
-  for (; i < r1.length; i++)
-    if (! equalPoint(r1[i], r2[r2.length-i-1]))
+  for (var i = 0; i < r1.length; i++)
+    if (r1[i] != r2[i])
       return false;
   return true;
 }
@@ -96,6 +89,7 @@ function forAllArcPoints(params, cb) {
   }
 
   function walkArc(object, arc) {
+    if (arc < 0) arc = - arc;
     if (! params.onlyOnce || ! seen.has(arc)) {
       if (seen) seen.add(arc);
       if (params.walkPoints)
@@ -130,7 +124,7 @@ export default function(basetopology, shattertopology, objects) {
 
   // Combine packed points and arcs
   topology.packed = {};
-  topology.packed.arcs = combineArcs(basetopology, shattertopology);
+  topology.packed.arcs = combineArcs(basetopology.packed.arcs, shattertopology.packed.arcs);
 
   // Compare arcs from base and shatter topology and see if they contain same points
   function equalArcs(b, s) { return equalRings(getarc(basetopology, b), getarc(shattertopology, s)) }
@@ -198,12 +192,6 @@ export default function(basetopology, shattertopology, objects) {
         }
      });
 
-  // Copy new shattering objects
-  for (var id in shattertopology.objects) {
-    var o = shattertopology.objects[id];
-    topology.objects[id] = Object.assign({}, o);
-  }
-
   // Determine how much base and shattering packed indices will grow in order to
   // determine how much larger packedindices buffer needs to be.
   var nExtra = 0;
@@ -216,45 +204,75 @@ export default function(basetopology, shattertopology, objects) {
   forAllArcPoints({ topology: shattertopology },
     (topology, object, arc) => {
         let replacements = shatArcs.get(arc);
-        nExtra += replacements.size-1;
+        if (replacements && replacements.size)
+          nExtra += replacements.size-1;
       });
+
+  // Stitch fragments together
+  function stitch(topo1, fullarc, topo2, arcset) {
+    let a1 = getarc(topo1, fullarc);
+    let a2 = Array.from(arcset);
+    let aa = a2.map((arc) => getarc(topo2, arc));
+    XXX find endpoints that match up
+    let m = new Map();
+    let s = hashPoint(a1[0]);
+    aa.forEach((a, i) => {
+        m.set(hashPoint(a[0]), { i, isstart: true, arc: a2[i] });
+        m.set(hashPoint(a[a.length-1]), { i, isstart: false, arc: a2[i] });
+      }
+    var frags = [];
+    while (frags.length < aa.length)
+    {
+    }
+  }
+
+  baseArcs.forEach((fullarc, arcset) =>
+    baseArcs.set(fullarc, stitch(basetopology, fullarc, shattertopology, arcset)));
+  shatArcs.forEach((fullarc, arcset) =>
+    shatArcs.set(fullarc, stitch(shattertopology, fullarc, basetopology, arcset)));
 
   var l1 = basetopology.packed.arcindices.length;
   var l2 = shattertopology.packed.arcindices.length;
   var ab = new ArrayBuffer((l1 + l2 + nExtra) * 4);
   var ai = new Int32Array(ab);
   topology.packed.arcindices = ai;
-  var k = 0;
 
-  function copyMultiPolygon(src, ksrc, splices, delta, mapdelta) {
-    var korig = k;
+  var k = 0;  // Tracks index in destination
+  var ksrc;   // Tracks index in source
+
+  function incrArc(arc, delta) {
+    return (arc < 0) ? arc - delta : arc + delta;
+  }
+
+  function sameSign(arc, arcabs) {
+    return arc < 0 ? - arcabs : arcabs;
+  }
+
+  function copyMultiPolygon(src, splices, delta, mapdelta) {
     var npoly = src[ksrc++];
     ai[k++] = npoly;
     for (var i = 0; i < npoly; i++)
-      copyPolygon(src, ksrc, splices, delta, mapdelta);
-    return korig;
+      copyPolygon(src, splices, delta, mapdelta);
   }
 
-  function copyPolygon(src, ksrc, splices, delta, mapdelta) {
-    var korig = k;
+  function copyPolygon(src, splices, delta, mapdelta) {
     var nring = src[ksrc++];
     ai[k++] = nring;
     for (var i = 0; i < nring; i++)
-      copyRing(src, ksrc, splices, delta, mapdelta);
-    return korig;
+      copyRing(src, splices, delta, mapdelta);
   }
 
-  function copyRing(src, ksrc, splices, delta, mapdelta) {
+  function copyRing(src, splices, delta, mapdelta) {
     var narc = src[ksrc++];
     ai[k++] = narc;
     for (var i = 0; i < narc; i++)
     {
       let arc = src[ksrc++];
-      let splice = splices.get(arc);
+      let splice = splices.get(Math.abs(arc));
       if (splice && splice.size)
-        splice.forEach(a => ai[k++] = a + mapdelta);
+        splice.forEach(a => ai[k++] = sameSign(arc, a + mapdelta));
       else
-        ai[k++] = arc + delta;
+        ai[k++] = incrArc(arc, delta);
     }
   }
 
@@ -263,16 +281,18 @@ export default function(basetopology, shattertopology, objects) {
   function copyObjects(src, objects, filterout, splices, delta, mapdelta) {
     for (var id in objects) {
       var o = objects[id];
-      if (filterout && ! filterout[id])
+      if (!filterout || !filterout[id])
       {
         o = Object.assign({}, o);
         topology.objects[id] = o;
+        ksrc = o.packedarcs;
+        o.packedarcs = k;
         switch (o.type) {
           case 'MultiPolygon':
-            o.packedarcs = copyMultiPolygon(src, o.packedarcs, splices, delta, mapdelta);
+            copyMultiPolygon(src, splices, delta, mapdelta);
             break;
           case 'Polygon':
-            o.packedarcs = copyPolygon(src, o.packedarcs, splices, delta, mapdelta);
+            copyPolygon(src, splices, delta, mapdelta);
             break;
         }
       }
