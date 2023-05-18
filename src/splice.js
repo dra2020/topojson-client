@@ -243,10 +243,11 @@ function dedup(af) {
       for (let j = i+1; j < end; j++) {
         var p1 = arcarray[i];
         var p2 = arcarray[j];
-        if (p1.arc != p2.arc && !arcToArc.has(p2.arc))
+        if (p1.arc != p2.arc && !arcToArc.has(p2.arc)) {
           var eq = equalArcs(p1.arc, p2.arc);
           if (eq)
             arcToArc.set(p2.arc, eq == 2 ? ~p1.arc : p1.arc);
+        }
       }
     start = end;
   }
