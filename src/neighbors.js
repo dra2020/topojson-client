@@ -1,6 +1,7 @@
 import bisect from "./bisect.js";
+import getobjectarcs from "./getobjectarcs.js";
 
-export default function(objects, includeborder) {
+export default function(topology, objects, includeborder) {
   var indexesByArc = {}, // arc index -> array of object indexes
       neighbors = objects.map(function() { return []; });
 
@@ -19,7 +20,7 @@ export default function(objects, includeborder) {
 
   function geometry(o, i) {
     if (o.type === "GeometryCollection") o.geometries.forEach(function(o) { geometry(o, i); });
-    else if (o.type in geometryType) geometryType[o.type](o.arcs, i);
+    else if (o.type in geometryType) geometryType[o.type](getobjectarcs(topology, o), i);
   }
 
   var geometryType = {

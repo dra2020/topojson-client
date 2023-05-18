@@ -2,7 +2,7 @@ var tape = require("tape"),
     topojson = require("../");
 
 tape("neighbors returns an empty array for empty input", function(test) {
-  test.deepEqual(topojson.neighbors([]), []);
+  test.deepEqual(topojson.neighbors(null, []), []);
   test.end();
 });
 
@@ -23,7 +23,7 @@ tape("neighbors returns an empty array for objects with no neighbors", function(
       [[0, 1], [1, 1]]
     ]
   };
-  test.deepEqual(topojson.neighbors([
+  test.deepEqual(topojson.neighbors(null, [
     topology.objects.ab,
     topology.objects.cd
   ]), [
@@ -48,7 +48,7 @@ tape("neighbors geometries that only share isolated points are not considered ne
       [[1, 0], [2, 0]]
     ]
   };
-  test.deepEqual(topojson.neighbors([
+  test.deepEqual(topojson.neighbors(null, [
     topology.objects.ab,
     topology.objects.bc
   ]), [
@@ -74,7 +74,7 @@ tape("neighbors geometries that share arcs are considered neighbors", function(t
       [[2, 0], [3, 0]]
     ]
   };
-  test.deepEqual(topojson.neighbors([
+  test.deepEqual(topojson.neighbors(null, [
     topology.objects.abc,
     topology.objects.bcd
   ]), [
@@ -100,7 +100,7 @@ tape("neighbors geometries that share reversed arcs are considered neighbors", f
       [[3, 0], [2, 0]]
     ]
   };
-  test.deepEqual(topojson.neighbors([
+  test.deepEqual(topojson.neighbors(null, [
     topology.objects.abc,
     topology.objects.dcb
   ]), [
@@ -132,7 +132,7 @@ tape("neighbors neighbors are returned in sorted order by index", function(test)
       [[4, 0], [5, 0]]
     ]
   };
-  test.deepEqual(topojson.neighbors([
+  test.deepEqual(topojson.neighbors(null, [
     topology.objects.abcd,
     topology.objects.bcde,
     topology.objects.cdef,
@@ -174,7 +174,7 @@ tape("neighbors the polygons ABCDA and BEFCB are neighbors, but GHIG is not", fu
       [[3, 0], [4, 1], [3, 1], [3, 0]]
     ]
   };
-  test.deepEqual(topojson.neighbors([
+  test.deepEqual(topojson.neighbors(null, [
     topology.objects.abcda,
     topology.objects.befcb,
     topology.objects.ghig
@@ -214,7 +214,7 @@ tape("neighbors the polygons ABEDGHKJA and BCLKHIFEB are neighbors, and not list
       [[2, 2], [3, 2], [3, 1], [2, 1]]
     ]
   };
-  test.deepEqual(topojson.neighbors([
+  test.deepEqual(topojson.neighbors(null, [
     topology.objects.abdeghkja,
     topology.objects.bclkhifeb
   ]), [
