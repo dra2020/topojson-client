@@ -23,6 +23,14 @@ d3.json("https://d3js.org/us-10m.v1.json", function(error, us) {
 </script>
 ```
 
+## This Fork
+
+This fork of topojson-client provides some additional features over the base repository:
+
+* It packs coordinates and arc indices into packed ArrayBuffers instead of using the standard inefficient representation of arrays of arrays of point arrays. This saves almost two orders of magnitude in memory use.
+* It fixes a bug in the handling of self-touching polygons when generating the GeoJSON representation (think of a figure eight).
+* It adds the splice API for combining multiple packed topologies into a single packed topology without having to generate the intermediate unpacked GeoJSON collection and unpacked topology.
+
 ## Installing
 
 If you use NPM, `npm install topojson-client`. Otherwise, download the [latest release](https://github.com/topojson/topojson-client/releases/latest). You can also load directly from [UNPKG](https://unpkg.com) as a [standalone library](https://unpkg.com/topojson-client@3). AMD, CommonJS, and vanilla environments are supported. In vanilla, a `topojson` global is exported:

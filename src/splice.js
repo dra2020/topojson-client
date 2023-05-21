@@ -15,7 +15,58 @@ function reverse(a, s, e) {
 }
 
 // guaranteed to not collide, but more expensive than just using a numeric hash
-function hashPoint(p) { return `${p[0]},${p[1]}` }
+function equalPoint(p1, p2) { return p1[0] == p2[0] && p1[1] == p2[1] }
+
+let buffer = new ArrayBuffer(16), floats = new Float64Array(buffer), uints = new Uint32Array(buffer);
+function hashPoint(point) {
+  floats[0] = point[0];
+  floats[1] = point[1];
+  var hash = uints[0] ^ uints[1];
+  hash = hash << 5 ^ hash >> 7 ^ uints[2] ^ uints[3];
+  return hash & 0x7fffffff;
+}
+
+function pointMap() {
+  let map = new Map();
+
+  function has(p) {
+    let i = hashPoint(p);
+    let e = map.get(i);
+    for (; e; e = e.next)
+      if (equalPoint(e.p, p))
+        return true;
+    return false;
+  }
+
+  function set(p, v) {
+    let i = hashPoint(p);
+    let e = map.get(i);
+    for (let c = e; c; c = c.next)
+      if (equalPoint(c.p, p)) {
+        c.v = v;
+        return;
+      }
+    map.set(i, { p: p, v: v, next: e });
+  }
+
+  function get(p) {
+    let i = hashPoint(p);
+    for (let e = map.get(i); e; e = e.next)
+      if (equalPoint(e.p, p))
+        return e.v;
+    return undefined;
+  }
+
+  function forEach(cb) {
+    map.forEach(e => {
+        for (; e; e = e.next)
+          cb(e.v, e.p);
+      });
+  }
+
+  return ({ has, set, get, forEach });
+}
+
 
 // Determine required space for these cuts [arclength][pointoffset]*[[pointx][pointy]]*
 function spaceFor(cuts) {
@@ -29,7 +80,10 @@ function spaceFor(cuts) {
   return { narcs, nfloats };
 }
 
+var validate = false;
+
 function validateArcPacking(af) {
+  if (! validate) return;
   let narcs = af[0];
   let zp = af[2];
   for (let i = 0; i < narcs; i++) {
@@ -45,8 +99,6 @@ function validateArcPacking(af) {
 }
 
 function validateObjects(topology) {
-
-  function equalPoint(p1, p2) { return p1[0] == p2[0] && p1[1] == p2[1] }
 
   function validateMultiPolygon(k) {
     var npoly = arcs[k++];
@@ -83,6 +135,7 @@ function validateObjects(topology) {
     return k;
   }
 
+  if (! validate) return;
   var arcs = topology.packed.arcindices;
   for (var id in topology.objects) {
     var o = topology.objects[id];
@@ -97,9 +150,10 @@ function validateObjects(topology) {
   }
 }
 
-/*
+var doTiming = false;
 var times = {};
 function t(s) {
+  if (!doTiming) return;
   if (times[s]) {
     var e = (new Date()).getTime();
     var ms = e - times[s];
@@ -109,7 +163,6 @@ function t(s) {
   else
     times[s] = (new Date()).getTime();
 }
-*/
 
 function reduceSum(accum, cur) { return accum+cur }
 
@@ -310,43 +363,40 @@ function forAllArcPoints(params, cb) {
   }
 }
 
-// Create a mapping from points to a map of arcs that contain that point. The map specifies whether
-// the point was an interior or end point.
+// Create a mapping from points to the arc containing that point and whether it is an endpoint.
+// We only track one arc for endpoints (even though they are likely referenced by multiple arcs)
+// since we only really care about the arc field for interior points (and there can only be one of those)
+// and whether a point is an endpoint in one topology (introducing a need to cut it in the other topologies
+// being spliced).
 function ptsToArcs(topology, objects) {
-  let map = new Map();
+  let map = pointMap();
   forAllArcPoints({ topology, objects, onlyOnce: true, walkPoints: true },
      (topology, object, arc, i, npoints, point) => {
-      let h = hashPoint(point);
-      if (! map.has(h)) map.set(h, new Map());
-      map.get(h).set(arc, i == 0 || i == npoints-1);
+      map.set(point, { arc, isend: i == 0 || i == npoints-1 });
    });
    return map;
 }
 
 // Compute new junctions pttoarcOthers forces on pttoarc1 (pt is interior for 1, endpoint for others)
 function newJunctions(pttoarc1, pttoarcOthers) {
-  let pointset = new Set();
+  let pointset = pointMap();
   let arcset = new Set();
 
-  pttoarc1.forEach((arcmap1, h) => {
-    pttoarcOthers.forEach(pttoarc2 => {
+  pttoarc1.forEach((arcpt1, p) => {
+    if (!arcpt1.isend) pttoarcOthers.forEach(pttoarc2 => {
       if (pttoarc2 !== pttoarc1)
       {
-        let arcmap2 = pttoarc2.get(h);
-        if (arcmap2)
-          arcmap1.forEach((e1, a1) => {
-            arcmap2.forEach(e2 => {
-                if (!e1 && e2)
-                {
-                  pointset.add(h);
-                  arcset.add(a1);
-                }
-              });
-          });
+        let arcpt2 = pttoarc2.get(p);
+        if (arcpt2 && arcpt2.isend)
+        {
+          pointset.set(p, true);
+          arcset.add(arcpt1.arc);
+        }
       }
     });
   });
 
+  // Return the arcs that need to be cut and the points where they are cut
   return { pointset, arcset };
 }
 
@@ -360,7 +410,7 @@ function cutArcs(topology, pointset, arcset) {
       ptarray.push(cut);
       for (let i = 0; i < pts.length; i++) {
         cut.push(pts[i]);
-        if (pointset.has(hashPoint(pts[i])))
+        if (pointset.has(pts[i]))
         {
           cut = [ pts[i] ];
           ptarray.push(cut);
@@ -476,20 +526,34 @@ export default function(topoarray) {
   // Validate
   topoarray.forEach(e => { if (!e.topology.packed) throw 'topojson.splice only works on packed topologies' });
 
-  // Compute arc overlaps
+  // Compute where arcs in one topo are broken in another
+  t('toposplice:ptToArcs');
   let ptsToArcsArray = topoarray.map(t => ptsToArcs(t.topology, t.filterout));
+  t('toposplice:ptToArcs');
+
+  t('toposplice:newJunctions');
   let newJunctionsArray = ptsToArcsArray.map(pttoarc1 => newJunctions(pttoarc1, ptsToArcsArray));
+  t('toposplice:newJunctions');
+
+  t('toposplice:cutarcs');
   let cutsarray = newJunctionsArray.map((e, index) => cutArcs(topoarray[index].topology, e.pointset, e.arcset));
+  t('toposplice:cutarcs');
 
   // Combine packed points and arcs and add new arc indices with their points
   topology.packed = {};
+  t('toposplice:combinearcs');
   var deltaarray = combineArcs(topology, topoarray, cutsarray);
+  t('toposplice:combinearcs');
 
   // Still need to dedup replicated arcs in the spliced topologies
+  t('toposplice:dedup');
   let dupMapping = dedup(topology.packed.arcs);
+  t('toposplice:dedup');
 
   // Now copy over objects with new arc indices
+  t('toposplice:combineindices');
   combineIndices(topology, topoarray, cutsarray, deltaarray, dupMapping);
+  t('toposplice:combineindices');
 
   // DEBUGGING VALIDATION
   topoarray.forEach(t => validateObjects(t.topology));
