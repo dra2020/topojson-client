@@ -1,72 +1,16 @@
 import getarc from "./getarc.js";
+import pointMap from "./pointmap.js";
+import reverseSegment from "./reversesegment.js";
+
+// Debugging aids
+import validateObjects from "./validateobjects.js";
+import validateArcPacking from "./validatearcpacking.js";
 
 // Copy from src to dst, srcend not inclusive
 function copyBuffer(src, dst, srcstart, srcend, dststart) {
   while (srcstart < srcend)
     dst[dststart++] = src[srcstart++];
 }
-
-// Reverse from start to end, non-inclusive of end
-function reverse(a, s, e) {
-  var t;
-  var m = s + (e - s) / 2;
-  for (e--; s < m; s++, e--)
-    t = a[s], a[s] = a[e], a[e] = t;
-}
-
-// guaranteed to not collide, but more expensive than just using a numeric hash
-function equalPoint(p1, p2) { return p1[0] == p2[0] && p1[1] == p2[1] }
-
-let buffer = new ArrayBuffer(16), floats = new Float64Array(buffer), uints = new Uint32Array(buffer);
-function hashPoint(point) {
-  floats[0] = point[0];
-  floats[1] = point[1];
-  var hash = uints[0] ^ uints[1];
-  hash = hash << 5 ^ hash >> 7 ^ uints[2] ^ uints[3];
-  return hash & 0x7fffffff;
-}
-
-function pointMap() {
-  let map = new Map();
-
-  function has(p) {
-    let i = hashPoint(p);
-    let e = map.get(i);
-    for (; e; e = e.next)
-      if (equalPoint(e.p, p))
-        return true;
-    return false;
-  }
-
-  function set(p, v) {
-    let i = hashPoint(p);
-    let e = map.get(i);
-    for (let c = e; c; c = c.next)
-      if (equalPoint(c.p, p)) {
-        c.v = v;
-        return;
-      }
-    map.set(i, { p: p, v: v, next: e });
-  }
-
-  function get(p) {
-    let i = hashPoint(p);
-    for (let e = map.get(i); e; e = e.next)
-      if (equalPoint(e.p, p))
-        return e.v;
-    return undefined;
-  }
-
-  function forEach(cb) {
-    map.forEach(e => {
-        for (; e; e = e.next)
-          cb(e.v, e.p);
-      });
-  }
-
-  return ({ has, set, get, forEach });
-}
-
 
 // Determine required space for these cuts [arclength][pointoffset]*[[pointx][pointy]]*
 function spaceFor(cuts) {
@@ -78,76 +22,6 @@ function spaceFor(cuts) {
     });
   nfloats += narcs * 2;
   return { narcs, nfloats };
-}
-
-var validate = false;
-
-function validateArcPacking(af) {
-  if (! validate) return;
-  let narcs = af[0];
-  let zp = af[2];
-  for (let i = 0; i < narcs; i++) {
-    let z = 1 + i*2;
-    let npoints = af[z];
-    let zpoints = af[z+1];
-    if (zp != zpoints)
-      console.log(`toposplice: arcpacking: point index unexpected for arc ${i}`);
-    zp += npoints * 2;
-  }
-  if (zp != af.length)
-    console.log(`toposplice: arcpacking: buffer length unexpected: last used index ${zp} != actual length ${af.length}`);
-}
-
-function validateObjects(topology) {
-
-  function validateMultiPolygon(k) {
-    var npoly = arcs[k++];
-    for (var i = 0; i < npoly; i++)
-      k = validatePolygon(k);
-    return k;
-  }
-
-  function validatePolygon(k) {
-    var nring = arcs[k++];
-    for (var i = 0; i < nring; i++)
-      k = validateRing(k);
-    return k;
-  }
-
-  function validateRing(k) {
-    var narc = arcs[k++];
-    var prev;
-    var allpoints = [];
-    var bad = 0;
-    for (var i = 0; i < narc; i++) {
-      let arc = arcs[k++];
-      let pts = getarc(topology, arc);
-      if (arc < 0) reverse(pts, 0, pts.length);
-      allpoints.push(pts);
-      var first = pts[0];
-      var last = pts[pts.length-1];
-      if (prev && !equalPoint(prev, first))
-        bad++;
-      prev = last;
-    }
-    if (bad)
-      console.log(`toposplice: ${bad} of ${allpoints.length} ring arcs do not merge`);
-    return k;
-  }
-
-  if (! validate) return;
-  var arcs = topology.packed.arcindices;
-  for (var id in topology.objects) {
-    var o = topology.objects[id];
-    switch (o.type) {
-      case 'MultiPolygon':
-        validateMultiPolygon(o.packedarcs);
-        break;
-      case 'Polygon':
-        validatePolygon(o.packedarcs);
-        break;
-    }
-  }
 }
 
 var doTiming = false;
@@ -238,10 +112,6 @@ function combineArcs(topology, topoarray, cutsarray) {
   return deltaarray;
 }
 
-// { x, y, arc }
-function sortPoints(p1, p2) { return p1.x != p2.x ? p1.x - p2.x : p1.y != p2.y ? p1.y - p2.y : p1.arc - p2.arc }
-function equalPoints(p1, p2) { return p1.x == p2.x ? p1.y == p2.y : false }
-
 // Return a mapping of any second instance of an arc to the first instance
 function dedup(af) {
 
@@ -275,36 +145,33 @@ function dedup(af) {
     return 0; // not equal
   }
 
-  // Create sorted array of arcs by start/end points
+  // Create map of start/end points
+  let ptMap = pointMap();
   let narcs = af[0];
-  let arcarray = new Array(narcs*2);
   for (let arc = 0; arc < narcs; arc++) {
     let npoints = af[1 + (arc*2)];
     let zpoint = af[1 + (arc*2) + 1];
     let zend = zpoint + (npoints-1)*2;
-    arcarray[arc*2] = { x: af[zpoint], y: af[zpoint+1], arc };
-    arcarray[arc*2+1] = { x: af[zend], y: af[zend+1], arc };
+    let ps = [ af[zpoint], af[zpoint+1] ];
+    let pe = [ af[zend], af[zend+1] ];
+    ptMap.set(ps, { arc, next: ptMap.get(ps) });
+    ptMap.set(pe, { arc, next: ptMap.get(pe) });
   }
-  arcarray.sort(sortPoints);
 
   let arcToArc = new Map();
-  var start = 0;
-  while (start < arcarray.length) {
-    // Find set of equal points to test for complete equality
-    var end; for (end = start+1; end < arcarray.length && equalPoints(arcarray[start], arcarray[end]); end++) ;
-    for (let i = start; i < end; i++)
-      for (let j = i+1; j < end; j++) {
-        var p1 = arcarray[i];
-        var p2 = arcarray[j];
-        if (p1.arc != p2.arc && !arcToArc.has(p2.arc)) {
-          var eq = equalArcs(p1.arc, p2.arc);
+  ptMap.forEach(e => {
+    let prev = e;
+    e = e.next;
+    for (; e; prev = e, e = e.next) {
+      if (prev.arc != e.arc && !arcToArc.has(prev.arc)) {
+          var eq = equalArcs(e.arc, prev.arc);
           if (eq)
-            arcToArc.set(p2.arc, eq == 2 ? ~p1.arc : p1.arc);
-        }
+            arcToArc.set(prev.arc, eq == 2 ? ~e.arc : e.arc);
       }
-    start = end;
-  }
+    }
+  });
   return arcToArc;
+
 }
 
 // cb(topology, object, arc, npoint, npoints, point)
@@ -464,7 +331,7 @@ function combineIndices(topology, topoarray, cutsarray, deltaarray, dupMapping) 
       if (splice && splice.length)
       {
         splice.forEach(a => { ai[k++] = sameSign(arc, translateArc(0, a)) });
-        if (arc < 0) reverse(ai, k - splice.length, k);
+        if (arc < 0) reverseSegment(ai, k - splice.length, k);
         nfinalarc += splice.length - 1;
       }
       else
