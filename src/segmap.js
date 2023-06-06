@@ -1,40 +1,40 @@
-// Map type using point as key ([ x, y]). Uses underlying default Map() object and chains collisions
+// Map type using segment as key (s: [ x, y], e: [ x, y ]). Uses underlying default Map() object and chains collisions
 // that occur with a pretty good int32 hashing algorithm (small tens of collisions for hundreds of thousands of GeoJSON points)
 // so chaining is not necessary much and mostly get Map performance.
 
 import pointHash from "./pointhash.js"
-import pointEqual from "./pointequal.js"
+import segEqual from "./segequal.js"
 
 export default function() {
   let map = new Map();
   let _length = 0;
 
-  function has(p) {
-    let i = pointHash(p);
+  function has(s) {
+    let i = pointHash(s.s);
     let e = map.get(i);
     for (; e; e = e.next)
-      if (pointEqual(e.p, p))
+      if (segEqual(e.s, s))
         return true;
     return false;
   }
 
-  function set(p, v) {
-    let i = pointHash(p);
+  function set(s, v) {
+    let i = pointHash(s.s);
     let e = map.get(i);
     for (let c = e; c; c = c.next)
-      if (pointEqual(c.p, p)) {
+      if (segEqual(c.s, s)) {
         c.v = v;
         return v;
       }
     _length++;
-    map.set(i, { p: p, v: v, next: e });
+    map.set(i, { s: s, v: v, next: e });
     return v;
   }
 
-  function get(p) {
-    let i = pointHash(p);
+  function get(s) {
+    let i = pointHash(s.s);
     for (let e = map.get(i); e; e = e.next)
-      if (pointEqual(e.p, p))
+      if (segEqual(e.s, s))
         return e.v;
     return undefined;
   }
@@ -42,7 +42,7 @@ export default function() {
   function forEach(cb) {
     map.forEach(e => {
         for (; e; e = e.next)
-          cb(e.v, e.p);
+          cb(e.v, e.s);
       });
   }
 

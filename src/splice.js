@@ -1,10 +1,14 @@
 import getarc from "./getarc.js";
 import pointMap from "./pointmap.js";
+import pointEqual from "./pointequal.js";
+import pointSort from "./pointsort.js";
 import reverseSegment from "./reversesegment.js";
+import forAllArcPoints from "./forallarcpoints.js";
 
 // Debugging aids
 import validateObjects from "./validateobjects.js";
 import validateArcPacking from "./validatearcpacking.js";
+import validateUniqueArcNeighbors from "./validateneighbors.js";
 
 // Copy from src to dst, srcend not inclusive
 function copyBuffer(src, dst, srcstart, srcend, dststart) {
@@ -145,6 +149,8 @@ function dedup(af) {
     return 0; // not equal
   }
 
+  let arcToArc = new Map();
+
   // Create map of start/end points
   let ptMap = pointMap();
   let narcs = af[0];
@@ -154,80 +160,32 @@ function dedup(af) {
     let zend = zpoint + (npoints-1)*2;
     let ps = [ af[zpoint], af[zpoint+1] ];
     let pe = [ af[zend], af[zend+1] ];
-    ptMap.set(ps, { arc, next: ptMap.get(ps) });
-    ptMap.set(pe, { arc, next: ptMap.get(pe) });
+    let prevs = ptMap.get(ps);
+    if (prevs) 
+      for (let p = prevs; p; p = p.next) {
+        let eq = equalArcs(arc, p.arc);
+        if (eq) {
+          arcToArc.set(arc, p.arc);
+          break;
+        }
+      }
+    let preve = ptMap.get(pe);
+    if (preve)
+      for (let p = preve; p; p = p.next) {
+        let eq = equalArcs(arc, p.arc);
+        if (eq) {
+          arcToArc.set(arc, p.arc);
+          break;
+        }
+      }
+    if (! arcToArc.has(arc)) {
+      ptMap.set(ps, { arc, next: prevs });
+      ptMap.set(pe, { arc, next: preve });
+    }
   }
 
-  let arcToArc = new Map();
-  ptMap.forEach(e => {
-    let prev = e;
-    e = e.next;
-    for (; e; prev = e, e = e.next) {
-      if (prev.arc != e.arc && !arcToArc.has(prev.arc)) {
-          var eq = equalArcs(e.arc, prev.arc);
-          if (eq)
-            arcToArc.set(prev.arc, eq == 2 ? ~e.arc : e.arc);
-      }
-    }
-  });
+  //console.log(`toposplice: ${arcToArc.size} dups found`);
   return arcToArc;
-
-}
-
-// cb(topology, object, arc, npoint, npoints, point)
-// params: { topology, objects, onlyOnce, walkPoints }
-
-function forAllArcPoints(params, cb) {
-  var pts = params.topology.packed.arcs;
-  var arcs = params.topology.packed.arcindices;
-  var seen = params.onlyOnce ? new Set() : null;
-  var objects = params.objects || params.topology.objects;
-
-  function walkMultiPolygon(object, z) {
-    let npoly = arcs[z++];
-    for (var i = 0; i < npoly; i++)
-      z = walkPolygon(object, z);
-    return z;
-  }
-
-  function walkPolygon(object, z) {
-    let nring = arcs[z++];
-    for (var i = 0; i < nring; i++)
-      z = walkRing(object, z);
-    return z;
-  }
-
-  function walkRing(object, z) {
-    let narc = arcs[z++];
-    for (var i = 0; i < narc; i++, z++)
-      walkArc(object, arcs[z]);
-    return z;
-  }
-
-  function walkArc(object, arc) {
-    if (arc < 0) arc = ~arc;
-    if (! params.onlyOnce || ! seen.has(arc)) {
-      if (seen) seen.add(arc);
-      if (params.walkPoints)
-      {
-        var z = 1 + arc * 2;
-        var npoints = pts[z];
-        var zpoint = pts[z+1];
-        for (var i = 0; i < npoints; i++, zpoint += 2)
-          cb(params.topology, object, arc, i, npoints, [ pts[zpoint], pts[zpoint+1] ]);
-      }
-      else
-        cb(params.topology, object, arc);
-    }
-  }
-
-  for (var id in objects) {
-    var object = params.topology.objects[id];
-    if (object) switch (object.type) {
-      case 'MultiPolygon': walkMultiPolygon(object, object.packedarcs); break;
-      case 'Polygon': walkPolygon(object, object.packedarcs); break;
-    }
-  }
 }
 
 // Create a mapping from points to the arc containing that point and whether it is an endpoint.
@@ -237,9 +195,21 @@ function forAllArcPoints(params, cb) {
 // being spliced).
 function ptsToArcs(topology, objects) {
   let map = pointMap();
-  forAllArcPoints({ topology, objects, onlyOnce: true, walkPoints: true },
-     (topology, object, arc, i, npoints, point) => {
-      map.set(point, { arc, isend: i == 0 || i == npoints-1 });
+  var pts = topology.packed.arcs;
+  forAllArcPoints({ topology, objects, onlyOnce: true },
+     (topology, object, arc) => {
+        var z = 1 + arc * 2;
+        var npoints = pts[z];
+        var zp = pts[z+1];
+        var prev;
+        var here = [ pts[zp++], pts[zp++] ];
+        var next;
+        // Note that endpoints might be set multiple times (overwriting), but ok since ANY endpoint forces a junction.
+        // Interior points will by definition only be set once, recording the unique neighbors.
+        for (var i = 0; i < npoints; i++, prev=here, here=next) {
+          next = i == npoints-1 ? undefined : [ pts[zp++], pts[zp++] ];
+          map.set(here, { arc, prev, next });
+        }
    });
    return map;
 }
@@ -249,13 +219,18 @@ function newJunctions(pttoarc1, pttoarcOthers) {
   let pointset = pointMap();
   let arcset = new Set();
 
+  function equalNeighbors(n1, n2) {
+    var p1, x1, p2, x2;
+    if (pointSort(n1.prev, n1.next) > 0) p1 = n1.prev, x1 = n1.next; else p1 = n1.next, x1 = n1.prev;
+    if (pointSort(n2.prev, n2.next) > 0) p2 = n2.prev, x2 = n2.next; else p2 = n2.next, x2 = n2.prev;
+    return pointEqual(p1, p2) && pointEqual(x1, x2);
+  }
+
   pttoarc1.forEach((arcpt1, p) => {
-    if (!arcpt1.isend) pttoarcOthers.forEach(pttoarc2 => {
-      if (pttoarc2 !== pttoarc1)
-      {
+    if (arcpt1.prev && arcpt1.next) pttoarcOthers.forEach(pttoarc2 => {
+      if (pttoarc2 !== pttoarc1) {
         let arcpt2 = pttoarc2.get(p);
-        if (arcpt2 && arcpt2.isend)
-        {
+        if (arcpt2 && !equalNeighbors(arcpt1, arcpt2)) {
           pointset.set(p, true);
           arcset.add(arcpt1.arc);
         }
@@ -264,6 +239,7 @@ function newJunctions(pttoarc1, pttoarcOthers) {
   });
 
   // Return the arcs that need to be cut and the points where they are cut
+  //console.log(`toposplice: splitting ${arcset.size} arcs at ${pointset.length()} points`);
   return { pointset, arcset };
 }
 
@@ -395,7 +371,7 @@ export default function(topoarray) {
 
   // Compute where arcs in one topo are broken in another
   t('toposplice:ptToArcs');
-  let ptsToArcsArray = topoarray.map(t => ptsToArcs(t.topology, t.filterout));
+  let ptsToArcsArray = topoarray.map((t, i) => ptsToArcs(t.topology, i == 0 ? t.filterout : null));
   t('toposplice:ptToArcs');
 
   t('toposplice:newJunctions');
@@ -425,6 +401,8 @@ export default function(topoarray) {
   // DEBUGGING VALIDATION
   topoarray.forEach(t => validateObjects(t.topology));
   validateObjects(topology);
+  topoarray.forEach(e => validateUniqueArcNeighbors(e.topology));
+  validateUniqueArcNeighbors(topology);
 
   return topology;
 }
