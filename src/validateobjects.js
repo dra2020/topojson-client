@@ -1,9 +1,8 @@
 import getarc from './getarc';
 import reverseSegment from './reversesegment.js';
 
-var validate = false;
-
-export default function(topology) {
+// validateObjects
+export default function(topology, validate) {
 
   function equalPoint(p1, p2) { return p1[0] == p2[0] && p1[1] == p2[1] }
 

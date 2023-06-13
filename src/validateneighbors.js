@@ -4,11 +4,9 @@ import segMap from "./segmap.js";
 import segCreate from "./segcreate.js";
 import forAllArcPoints from "./forallarcpoints.js";
 
-var validate = false;
-
 // Validate that there are no two arcs that contain the same two-point segment.
 // Approach: add point segment as pointMap => pointMap with the 
-export default function(topology) {
+export default function(topology, validate) {
   if (! validate) return;
   let ptindex = pointMap();
   function p2i(p) { return ptindex.has(p) ? ptindex.get(p) : ptindex.set(p, ptindex.length()) } 

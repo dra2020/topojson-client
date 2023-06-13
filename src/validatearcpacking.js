@@ -1,6 +1,4 @@
-var validate = false;
-
-export default function(af) {
+export default function(af, validate) {
   if (! validate) return;
   let narcs = af[0];
   let zp = af[2];

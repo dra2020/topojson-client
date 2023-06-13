@@ -6,6 +6,7 @@ import reverseSegment from "./reversesegment.js";
 import forAllArcPoints from "./forallarcpoints.js";
 
 // Debugging aids
+var validate = false;  // should be false for production use
 import validateObjects from "./validateobjects.js";
 import validateArcPacking from "./validatearcpacking.js";
 import validateUniqueArcNeighbors from "./validateneighbors.js";
@@ -110,7 +111,7 @@ function combineArcs(topology, topoarray, cutsarray) {
   });
 
   // DEBUGGING VALIDATION
-  validateArcPacking(af);
+  validateArcPacking(af, validate);
 
   topology.packed.arcs = af;
   return deltaarray;
@@ -165,7 +166,8 @@ function dedup(af) {
       for (let p = prevs; p; p = p.next) {
         let eq = equalArcs(arc, p.arc);
         if (eq) {
-          arcToArc.set(arc, p.arc);
+          // if (eq == 2) console.log(`toposplice: reverse arc mapping: ${arc} to ${p.arc}`);
+          arcToArc.set(arc, eq == 2 ? ~p.arc : p.arc);
           break;
         }
       }
@@ -174,7 +176,8 @@ function dedup(af) {
       for (let p = preve; p; p = p.next) {
         let eq = equalArcs(arc, p.arc);
         if (eq) {
-          arcToArc.set(arc, p.arc);
+          // if (eq == 2) console.log(`toposplice: reverse arc mapping: ${arc} to ${p.arc}`);
+          arcToArc.set(arc, eq == 2 ? ~p.arc : p.arc);
           break;
         }
       }
@@ -184,7 +187,8 @@ function dedup(af) {
     }
   }
 
-  //console.log(`toposplice: ${arcToArc.size} dups found`);
+  if (validate) console.log(`toposplice: ${arcToArc.size} dups found`);
+  if (validate) arcToArc.forEach((v, k) => { console.log(`toposplice: dedupmap: ${k} to ${v}`) });
   return arcToArc;
 }
 
@@ -248,18 +252,17 @@ function cutArcs(topology, pointset, arcset) {
   let m = new Map();
   arcset.forEach(arc => {
       let pts = getarc(topology, arc);
-      let ptarray = [];
+      let cuts = [];
       let cut = [];
-      ptarray.push(cut);
+      cuts.push(cut);
       for (let i = 0; i < pts.length; i++) {
         cut.push(pts[i]);
-        if (pointset.has(pts[i]))
-        {
+        if (pointset.has(pts[i])) {
           cut = [ pts[i] ];
-          ptarray.push(cut);
+          cuts.push(cut);
         }
       }
-      m.set(arc, ptarray);
+      m.set(arc, cuts);
   });
   return m;
 }
@@ -276,8 +279,10 @@ function combineIndices(topology, topoarray, cutsarray, deltaarray, dupMapping) 
   function translateArc(index, arc) {
     let absarc = (arc < 0) ? ~arc : arc;
     absarc += deltaarray[index];
-    if (dupMapping.has(absarc))
+    if (dupMapping.has(absarc)) {
+      if (validate) console.log(`toposplice: deduping ${absarc} (orig ${arc}) to ${dupMapping.get(absarc)}`);
       absarc = dupMapping.get(absarc);
+    }
     return sameSign(arc, absarc);
   }
 
@@ -300,12 +305,11 @@ function combineIndices(topology, topoarray, cutsarray, deltaarray, dupMapping) 
     var karc = k;
     var nfinalarc = narc;
     ai[k++] = narc;
-    for (var i = 0; i < narc; i++)
-    {
+    for (var i = 0; i < narc; i++) {
       let arc = src[ksrc++];
       let splice = cutsarray[index].get(arc < 0 ? ~arc : arc);
-      if (splice && splice.length)
-      {
+      if (splice && splice.length) {
+        if (validate) console.log(`toposplice: splicing`);
         splice.forEach(a => { ai[k++] = sameSign(arc, translateArc(0, a)) });
         if (arc < 0) reverseSegment(ai, k - splice.length, k);
         nfinalarc += splice.length - 1;
@@ -323,10 +327,10 @@ function combineIndices(topology, topoarray, cutsarray, deltaarray, dupMapping) 
     src = topoarray[index].topology.packed.arcindices;
     for (var id in objects) {
       var o = objects[id];
-      if (!filterout || !filterout[id])
-      {
+      if (!filterout || !filterout[id]) {
         o = Object.assign({}, o);
         topology.objects[id] = o;
+        if (validate) console.log(`toposplice: ${o.properties.id}: copying`);
         ksrc = o.packedarcs;
         o.packedarcs = k;
         switch (o.type) {
@@ -399,10 +403,10 @@ export default function(topoarray) {
   t('toposplice:combineindices');
 
   // DEBUGGING VALIDATION
-  topoarray.forEach(t => validateObjects(t.topology));
-  validateObjects(topology);
-  topoarray.forEach(e => validateUniqueArcNeighbors(e.topology));
-  validateUniqueArcNeighbors(topology);
+  topoarray.forEach(t => validateObjects(t.topology, validate));
+  validateObjects(topology, validate);
+  topoarray.forEach(e => validateUniqueArcNeighbors(e.topology, validate));
+  validateUniqueArcNeighbors(topology, validate);
 
   return topology;
 }
