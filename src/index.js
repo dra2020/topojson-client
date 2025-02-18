@@ -14,3 +14,4 @@ export {default as unpackArcs} from "./unpackarcs.js";
 export {default as packArcIndices} from "./packarcindices.js";
 export {default as unpackArcIndices} from "./unpackarcindices.js";
 export {default as splice} from "./splice.js";
+export {default as forAllArcPoints} from "./forallarcpoints.js";

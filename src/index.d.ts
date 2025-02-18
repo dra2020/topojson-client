@@ -39,6 +39,8 @@ export function packArcs(topology: Topology): Topology;
 export function unpackArcs(topology: Topology): Topology;
 export function packArcIndices(topology: Topology): Topology;
 export function unpackArcIndices(topology: Topology): Topology;
+export function forAllArcPoints(params: { topology: Topology, objects?: any, onlyOnce?: boolean, walkPoints?: boolean },
+                                cb: (topology: Topology, object: any, arc: any) => void);
 export type SpliceEntry = { topology: Topology, filterout?: any };
 export function splice(topoarray: SpliceEntry[]): Topology;
 
