@@ -1,6 +1,6 @@
 {
   "name": "@dra2020/topojson-client",
-  "version": "3.2.15",
+  "version": "3.2.16",
   "description": "Manipulate TopoJSON and convert it to GeoJSON.",
   "keywords": [
     "topojson",

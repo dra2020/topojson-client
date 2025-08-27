@@ -364,6 +364,25 @@ function combineIndices(topology, topoarray, cutsarray, deltaarray, dupMapping) 
   topoarray.forEach((t, index) => copyObjects(index));
 }
 
+// Return the filterout subset only if the objects actually exist in one of the topos. We can
+// only do the "cheap" ptsToArcs if the filterout subset exists in the filtered topologies.
+//
+function filterSubset(topoarray) {
+  if (!topoarray || !topoarray.length) return null;
+  let t = topoarray[0];
+  if (! t.filterout) return null;
+  for (var id in t.filterout) {
+    var o;
+    for (var i = 0; i < topoarray.length; i++)
+      if (!o) o = topoarray[i].topology.objects[id];
+    if (!o) {
+      //console.log('topojson:splice: default to full pts2arcs mapping');
+      return null;
+    }
+  }
+  return t.filterout;
+}
+
 // Given an array of [topology, objects] pairs, combine them into a single topology.
 // The "objects" hash field specifies the objects being filtered out of the topology (and replaced by the other topologies).
 
@@ -375,7 +394,7 @@ export default function(topoarray) {
 
   // Compute where arcs in one topo are broken in another
   t('toposplice:ptToArcs');
-  let ptsToArcsArray = topoarray.map((t, i) => ptsToArcs(t.topology, i == 0 ? t.filterout : null));
+  let ptsToArcsArray = topoarray.map((t, i) => ptsToArcs(t.topology, i == 0 ? filterSubset(topoarray) : null));
   t('toposplice:ptToArcs');
 
   t('toposplice:newJunctions');
